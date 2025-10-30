@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>br.com.praxis</groupId>
+    <artifactId>praxis-files-parent</artifactId>
+    <version>1.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Praxis :: File Management :: Parent</name>
+    <description>Dedicated repository for Praxis File Management libraries (API, Core, Web, Starter) and sample app.</description>
+    <url>https://github.com/codexrodrigues/praxis-file-management</url>
+
+    <scm>
+        <url>https://github.com/codexrodrigues/praxis-file-management</url>
+        <connection>scm:git:https://github.com/codexrodrigues/praxis-file-management.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/codexrodrigues/praxis-file-management.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <java.version>21</java.version>
+        <spring-boot.version>3.2.5</spring-boot.version>
+        <springdoc.version>2.3.0</springdoc.version>
+        <tika.version>2.9.1</tika.version>
+        <bucket4j.version>7.6.0</bucket4j.version>
+        <clamav.version>2.1.2</clamav.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <modules>
+        <module>praxis-files-api</module>
+        <module>praxis-files-core</module>
+        <module>praxis-files-web</module>
+        <module>praxis-files-starter</module>
+        <module>praxis-files-app</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- SpringDoc OpenAPI - versão centralizada -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- Apache Tika for MIME type detection -->
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-core</artifactId>
+                <version>${tika.version}</version>
+            </dependency>
+
+            <!-- Bucket4j for rate limiting -->
+            <dependency>
+                <groupId>com.github.vladimir-bukhtoyarov</groupId>
+                <artifactId>bucket4j-core</artifactId>
+                <version>${bucket4j.version}</version>
+            </dependency>
+
+            <!-- ClamAV client for virus scanning -->
+            <dependency>
+                <groupId>xyz.capybara</groupId>
+                <artifactId>clamav-client</artifactId>
+                <version>${clamav.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>

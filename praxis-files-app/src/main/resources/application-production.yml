@@ -1,0 +1,139 @@
+# ===================================================================================
+# Production Configuration - File Management Library
+# ===================================================================================
+# Consolidated production settings replacing all phase-specific configs
+# Use with: java -jar app.jar --spring.profiles.active=production
+
+spring:
+  profiles:
+    active: production
+  application:
+    name: file-management-production
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+
+server:
+  port: 8086
+
+# ===================================================================================
+# File Management Library Configuration - PRODUCTION
+# ===================================================================================
+file:
+  management:
+    upload-dir: /var/lib/file-management/uploads
+    
+    # Virus Scanning - ENABLED for production security
+    virus-scanning:
+      enabled: true
+      max-file-size-bytes: 26214400  # 25MB
+      connection-timeout: 5000
+      read-timeout: 30000
+      fail-on-scanner-unavailable: true  # Strict security in production
+      quarantine-infected-files: true
+      delete-infected-files: true
+    
+    # Security Settings - STRICT for production
+    security:
+      permit-file-endpoints: false
+      permit-actuator-endpoints: false
+      permit-health-endpoints: true  # Keep health checks
+      require-authentication-by-default: true
+      csrf-enabled: true
+      cors-enabled: true
+      allowed-origins:
+        - https://prod.exemplo.com.br
+        - https://api.exemplo.com.br
+      permitted-patterns:
+        - /health
+        - /actuator/health
+    
+    # Audit and Monitoring - ENABLED for production
+    audit-logging:
+      enabled: true
+      log-successful-uploads: true
+      log-failed-uploads: true
+      log-security-events: true
+      log-file: /var/log/file-management/audit.log
+    
+    monitoring:
+      enabled: true
+      metrics-enabled: true
+      security-monitoring: true
+
+# ===================================================================================
+# OpenAPI/Swagger - DISABLED in production
+# ===================================================================================
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# ===================================================================================
+# Spring Boot Actuator - Production Security Configuration
+# ===================================================================================
+management:
+  endpoints:
+    web:
+      # Only expose essential endpoints in production
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      # Custom health groups for file management
+      group:
+        filemanagement:
+          include: diskSpace,ping
+          show-details: when-authorized
+    
+    # Disable sensitive endpoints in production
+    env:
+      enabled: false
+    configprops:
+      enabled: false
+    mappings:
+      enabled: false
+  
+  # Security for actuator endpoints
+  security:
+    enabled: true
+    roles: ACTUATOR_ADMIN
+  
+  # Metrics configuration
+  metrics:
+    export:
+      prometheus:
+        enabled: false  # Enable only if Prometheus is used
+
+# Info endpoint configuration
+info:
+  app:
+    name: ${spring.application.name}
+    version: "@project.version@"
+    description: "ErgonX File Management Library - Production"
+
+# ===================================================================================
+# Logging Configuration - Production Level
+# ===================================================================================
+logging:
+  level:
+    br.com.praxis.filemanagement: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+  file:
+    name: /var/log/file-management/application.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+
+# ===================================================================================
+# JVM and Performance Settings (via environment variables)
+# ===================================================================================
+# Set these as environment variables:
+# JAVA_OPTS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"

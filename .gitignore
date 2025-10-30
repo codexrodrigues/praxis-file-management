@@ -1,0 +1,29 @@
+# Maven
+target/
+*/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Logs and runtime files
+*.log
+*.tmp
+*.swp
+*.swo
+uploads/
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+
+# Node scripts in repo
+scripts/node_modules/
+**/node_modules/
+
+# OS
+ehthumbs.db
+Desktop.ini

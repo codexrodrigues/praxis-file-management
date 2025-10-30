@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\\
+br.com.praxis.filemanagement.starter.autoconfigure.FileManagementAutoConfiguration,\\
+br.com.praxis.filemanagement.starter.autoconfigure.FileManagementSecurityAutoConfiguration
