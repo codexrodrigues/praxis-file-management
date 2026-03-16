@@ -44,9 +44,13 @@ class FileControllerPathTraversalTest {
 
         Mockito.when(fileService.uploadFile(Mockito.any(), Mockito.isNull())).thenReturn(result);
 
-        ResponseEntity<Map<String, Object>> response = controller.uploadSingleFile(file, null, null, null);
+        ResponseEntity<Map<String, Object>> response = controller.uploadSingleFile(file, null, null, null, null, null);
 
         assertEquals(400, response.getStatusCode().value());
         assertNotNull(response.getBody());
+        assertEquals("failure", response.getBody().get("status"));
+        assertFalse(response.getBody().containsKey("code"));
+        assertFalse(response.getBody().containsKey("details"));
+        assertTrue(response.getBody().containsKey("errors"));
     }
 }

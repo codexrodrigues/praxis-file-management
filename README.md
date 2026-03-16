@@ -32,9 +32,23 @@ file.management.upload-dir=./uploads
 
 3. Start your application and upload a file:
 ```bash
-curl -F file=@README.md http://localhost:8080/file-management/upload
+curl -F file=@README.md http://localhost:8080/api/files/upload
 ```
 Expected response: `201 Created`.
+
+Current public HTTP endpoints:
+
+- `POST /api/files/upload` - single file upload
+- `POST /api/files/upload/bulk` - bulk upload (canonical path)
+- `POST /api/files/bulk` - bulk upload (compatibility alias)
+- `POST /api/files/upload/presign` - pre-signed upload URL
+- `GET /api/files/config` - effective upload configuration
+
+Compatibility note:
+
+- The backend now accepts both `POST /api/files/upload/bulk` and `POST /api/files/bulk`.
+- The current `@praxisui/files-upload` frontend integration expects `{baseUrl}/bulk`.
+- Remaining compatibility gaps are tracked in `docs/praxis-alignment/COMPATIBILITY_MATRIX.md`.
 
 ## Default behaviour
 
@@ -61,7 +75,8 @@ Example response:
 
 ```json
 {
-  "success": true,
+  "status": "success",
+  "message": "Configuração efetiva recuperada com sucesso",
   "timestamp": "2025-08-22T12:34:56.789Z",
   "data": {
     "options": { "nameConflictPolicy": "RENAME" },
@@ -76,6 +91,140 @@ Example response:
   }
 }
 ```
+
+## HTTP contract snapshot
+
+The current backend contract is documented below as implemented today.
+
+### Single upload
+
+Endpoint:
+
+```bash
+POST /api/files/upload
+```
+
+Multipart fields:
+
+- `file` - required
+- `options` - optional JSON serialized from `FileUploadOptionsRecord`
+- `metadata` - optional JSON object merged into `customMetadata`
+- `conflictPolicy` - optional direct override for `nameConflictPolicy`
+
+Context headers:
+
+- `X-Tenant-Id` - optional
+- `X-User-Id` - optional
+
+Success response shape:
+
+```json
+{
+  "status": "success",
+  "message": "Upload realizado com sucesso",
+  "timestamp": "2025-07-10T23:15:30.123Z",
+  "data": {
+    "originalFilename": "documento.pdf",
+    "serverFilename": "doc_a1b2c3d4.pdf",
+    "fileId": "550e8400-e29b-41d4-a716-446655440000",
+    "fileSize": 1048576,
+    "mimeType": "application/pdf",
+    "uploadTimestamp": "2025-07-10T23:15:30.123Z"
+  }
+}
+```
+
+### Bulk upload
+
+Endpoint:
+
+```bash
+POST /api/files/upload/bulk
+POST /api/files/bulk
+```
+
+Multipart fields:
+
+- `files` - required
+- `options` - optional JSON serialized from `FileUploadOptionsRecord`
+- `metadata` - optional JSON array for frontend compatibility; homogeneous values are accepted for the whole batch
+- `conflictPolicy` - optional JSON array for frontend compatibility; homogeneous values are accepted for the whole batch
+- `failFastMode` - optional direct override
+- `strictValidation` - optional direct override
+- `maxUploadSizeMb` - optional direct override
+
+Context headers:
+
+- `X-Tenant-Id` - optional
+- `X-User-Id` - optional
+
+Success or partial-success response shape:
+
+```json
+{
+  "status": "partial_success",
+  "message": "Upload em lote processado com sucesso parcial",
+  "timestamp": "2025-07-21T20:15:35.456Z",
+  "data": {
+    "totalProcessed": 3,
+    "totalSuccess": 2,
+    "totalFailed": 1,
+    "totalCancelled": 0,
+    "wasFailFastTriggered": false,
+    "overallSuccess": false,
+    "processingTimeMs": 5333,
+    "totalSizeBytes": 3145728,
+    "successRate": "66.67%",
+    "results": []
+  }
+}
+```
+
+Error handling contract:
+
+- The canonical error structure is `errors[]`.
+- Root aliases such as `success`, `error`, `code` and `details` are no longer part of the public runtime contract.
+- Successful responses use `status`, `message`, `data` and `timestamp`.
+- Bulk keeps its specialized result list inside `data.results`.
+- For bulk requests, `metadata` and `conflictPolicy` arrays are accepted when all entries in the batch are equal.
+- Distinct per-file `metadata` and `conflictPolicy` values currently return `400`.
+
+### Pre-signed upload
+
+Endpoint:
+
+```bash
+POST /api/files/upload/presign?filename=test.txt
+```
+
+Response shape:
+
+```json
+{
+  "uploadUrl": "https://example.com/upload/test.txt?signature=dummy",
+  "headers": {},
+  "fields": {}
+}
+```
+
+### Effective configuration
+
+Endpoint:
+
+```bash
+GET /api/files/config
+```
+
+Headers:
+
+- `X-Tenant-Id` - optional
+- `X-User-Id` - optional
+- `If-None-Match` - optional
+
+Notes:
+
+- Response is cached with `ETag`.
+- This endpoint is the part of the backend contract that is already compatible with the current `@praxisui/files-upload` config loader.
 
 ## Configuration properties
 
@@ -193,7 +342,7 @@ A proof-of-concept endpoint generates pre-signed URLs so clients can upload dire
 curl -X POST "http://localhost:8080/api/files/upload/presign?filename=test.txt"
 ```
 
-The response contains a temporary `url` that accepts a `PUT` request with the file contents.
+The response contains a temporary `uploadUrl` that accepts a `PUT` request with the file contents, plus empty `headers` and `fields` objects for compatibility with frontend clients.
 
 ## Headless mode
 
@@ -215,3 +364,14 @@ Run the sample with `--spring.profiles.active=headless` to bootstrap without con
 - [Monitoring & Alerting Guide](guides/monitoring-alerting-guide.md)
 - [Disaster Recovery Guide](guides/disaster-recovery-guide.md)
 - [Enterprise Visual Reference](guides/enterprise-visuals.md)
+
+## Praxis alignment
+
+Arquivos de planejamento e retomada da análise de alinhamento com a plataforma Praxis:
+
+- [Alignment Overview](docs/praxis-alignment/README.md)
+- [Status](docs/praxis-alignment/STATUS.md)
+- [Execution Plan](docs/praxis-alignment/EXECUTION_PLAN.md)
+- [Compatibility Matrix](docs/praxis-alignment/COMPATIBILITY_MATRIX.md)
+- [Operational Backlog](docs/praxis-alignment/OPERATIONAL_BACKLOG.md)
+- [Conversation Log](docs/praxis-alignment/CONVERSATION_LOG.md)

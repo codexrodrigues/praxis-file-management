@@ -584,7 +584,8 @@ public class LocalStorageFileService implements FileService {
         Path uploadPath = Paths.get(fileManagementProperties.getUploadDir()).toAbsolutePath().normalize();
         Path tempPath = Paths.get(fileManagementProperties.getUploadTempDir()).toAbsolutePath().normalize();
         Path destinationPath;
-        String serverFilename;
+        String serverFilename = null;
+        boolean renameReservationActive = false;
 
         try {
             Files.createDirectories(uploadPath); // Ensure directory exists
@@ -652,6 +653,7 @@ public class LocalStorageFileService implements FileService {
                             sanitizedFilename, uploadPath);
                         serverFilename = namingResult.finalName();
                         destinationPath = uploadPath.resolve(serverFilename).normalize();
+                        renameReservationActive = true;
 
                         // Log naming strategy used for debugging/monitoring
                         logger.debug("RENAME policy used strategy: {} after {} attempts for file: {}",
@@ -704,6 +706,10 @@ public class LocalStorageFileService implements FileService {
 
             logger.debug("Atomic upload completed successfully. Transaction: {}, Steps: {}",
                        transaction.getTransactionId(), transaction.getStepCount());
+            if (renameReservationActive) {
+                fileNamingService.releaseReservedName(uploadPath, serverFilename);
+                renameReservationActive = false;
+            }
 
             logger.info("File uploaded successfully: {} -> {}", file.getOriginalFilename(), serverFilename);
             recordSuccessfulUpload(timerSample);
@@ -736,6 +742,9 @@ public class LocalStorageFileService implements FileService {
             );
 
         } catch (IOException e) {
+            if (renameReservationActive && serverFilename != null) {
+                fileNamingService.releaseReservedName(uploadPath, serverFilename);
+            }
             logger.error("Failed to store file: {}", file.getOriginalFilename(), e);
             recordFailedUpload(timerSample, FileErrorReason.UNKNOWN_ERROR);
 
@@ -762,13 +771,20 @@ public class LocalStorageFileService implements FileService {
             return true; // No options provided, no validation
         }
 
+        boolean hasExtensionConstraint = options.allowedExtensions() != null && !options.allowedExtensions().isEmpty();
+        boolean hasMimeTypeConstraint = options.acceptMimeTypes() != null && !options.acceptMimeTypes().isEmpty();
+
+        if (!hasExtensionConstraint && !hasMimeTypeConstraint) {
+            return true;
+        }
+
         boolean extensionAllowed = true;
-        if (options.allowedExtensions() != null && !options.allowedExtensions().isEmpty()) {
+        if (hasExtensionConstraint) {
             extensionAllowed = options.allowedExtensions().contains(fileExtension.toLowerCase());
         }
 
         boolean mimeTypeAllowed = true;
-        if (options.acceptMimeTypes() != null && !options.acceptMimeTypes().isEmpty()) {
+        if (hasMimeTypeConstraint) {
             mimeTypeAllowed = options.acceptMimeTypes().contains(detectedMimeType);
         }
 
@@ -776,6 +792,14 @@ public class LocalStorageFileService implements FileService {
         if (detectedMimeType != null && clientMimeType != null && !detectedMimeType.equals(clientMimeType)) {
             logger.warn("Security: MIME type mismatch detected - Client: {}, Detected: {}", clientMimeType, detectedMimeType);
             // For strict validation, log the mismatch but continue with type validation
+        }
+
+        if (!hasExtensionConstraint) {
+            return mimeTypeAllowed;
+        }
+
+        if (!hasMimeTypeConstraint) {
+            return extensionAllowed;
         }
 
         return options.strictValidation() ? extensionAllowed && mimeTypeAllowed : extensionAllowed || mimeTypeAllowed;

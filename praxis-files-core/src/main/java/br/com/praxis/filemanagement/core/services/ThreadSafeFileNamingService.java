@@ -10,7 +10,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -27,6 +29,7 @@ public class ThreadSafeFileNamingService {
     
     private static final int MAX_RENAME_ATTEMPTS = 1000;
     private static final int RANDOM_SUFFIX_LENGTH = 4;
+    private final ConcurrentHashMap<Path, Set<String>> reservedNamesByDirectory = new ConcurrentHashMap<>();
     
     /**
      * Resultado da geração de nome único.
@@ -66,23 +69,24 @@ public class ThreadSafeFileNamingService {
             throws IOException {
         
         validateParameters(originalFilename, targetDirectory);
+        Path normalizedDirectory = targetDirectory.toAbsolutePath().normalize();
         
         FileNameComponents components = FileNameHandler.decompose(originalFilename);
         
         // Estratégia 1: Tentar nome original primeiro
-        UniqueNameResult originalResult = tryOriginalName(components, targetDirectory);
+        UniqueNameResult originalResult = tryOriginalName(components, normalizedDirectory);
         if (originalResult != null) {
             return originalResult;
         }
         
         // Estratégia 2: Tentar incrementos numéricos
-        UniqueNameResult incrementalResult = tryIncrementalNaming(components, targetDirectory);
+        UniqueNameResult incrementalResult = tryIncrementalNaming(components, normalizedDirectory);
         if (incrementalResult != null) {
             return incrementalResult;
         }
         
         // Estratégia 3: Hybrid approach com sufixo aleatório
-        UniqueNameResult hybridResult = tryHybridNaming(components, targetDirectory);
+        UniqueNameResult hybridResult = tryHybridNaming(components, normalizedDirectory);
         if (hybridResult != null) {
             return hybridResult;
         }
@@ -120,7 +124,7 @@ public class ThreadSafeFileNamingService {
         String originalName = components.getFullName();
         Path targetPath = targetDirectory.resolve(originalName);
         
-        if (isNameAvailable(targetPath)) {
+        if (reserveNameIfAvailable(targetPath)) {
             logger.debug("Nome original disponível: {}", originalName);
             return new UniqueNameResult(originalName, components, 1, NamingStrategy.ORIGINAL);
         }
@@ -138,7 +142,7 @@ public class ThreadSafeFileNamingService {
             String incrementalName = FileNameHandler.createIncrementalName(components, i);
             Path targetPath = targetDirectory.resolve(incrementalName);
             
-            if (isNameAvailable(targetPath)) {
+            if (reserveNameIfAvailable(targetPath)) {
                 logger.debug("Nome incremental disponível após {} tentativas: {}", i, incrementalName);
                 return new UniqueNameResult(incrementalName, components, i + 1, NamingStrategy.INCREMENTAL);
             }
@@ -173,7 +177,7 @@ public class ThreadSafeFileNamingService {
             String hybridName = hybridComponents.getFullName();
             Path targetPath = targetDirectory.resolve(hybridName);
             
-            if (isNameAvailable(targetPath)) {
+            if (reserveNameIfAvailable(targetPath)) {
                 logger.debug("Nome híbrido disponível após {} tentativas: {}", attempt, hybridName);
                 return new UniqueNameResult(hybridName, hybridComponents, attempt, NamingStrategy.HYBRID);
             }
@@ -208,6 +212,29 @@ public class ThreadSafeFileNamingService {
      * Verifica se um nome está disponível de forma thread-safe.
      * Usa tentativa de criação atômica para evitar race conditions.
      */
+    private boolean reserveNameIfAvailable(Path targetPath) throws IOException {
+        Path normalizedPath = targetPath.toAbsolutePath().normalize();
+        Path directory = normalizedPath.getParent();
+        String filename = normalizedPath.getFileName().toString();
+        Set<String> reservedNames = reservedNamesByDirectory.computeIfAbsent(
+            directory,
+            ignored -> ConcurrentHashMap.newKeySet()
+        );
+
+        synchronized (reservedNames) {
+            if (reservedNames.contains(filename)) {
+                return false;
+            }
+
+            if (!isNameAvailable(normalizedPath)) {
+                return false;
+            }
+
+            reservedNames.add(filename);
+            return true;
+        }
+    }
+
     private boolean isNameAvailable(Path targetPath) throws IOException {
         try {
             // Tentativa atômica de criação do arquivo
@@ -257,5 +284,25 @@ public class ThreadSafeFileNamingService {
         
         FileNameComponents components = FileNameHandler.decompose(originalFilename);
         return generateUuidFallback(components);
+    }
+
+    /**
+     * Libera uma reserva de nome anteriormente gerada pela política RENAME.
+     */
+    public void releaseReservedName(Path targetDirectory, String filename) {
+        if (targetDirectory == null || filename == null || filename.isBlank()) {
+            return;
+        }
+
+        Path normalizedDirectory = targetDirectory.toAbsolutePath().normalize();
+        Set<String> reservedNames = reservedNamesByDirectory.get(normalizedDirectory);
+        if (reservedNames == null) {
+            return;
+        }
+
+        reservedNames.remove(filename);
+        if (reservedNames.isEmpty()) {
+            reservedNamesByDirectory.remove(normalizedDirectory, reservedNames);
+        }
     }
 }

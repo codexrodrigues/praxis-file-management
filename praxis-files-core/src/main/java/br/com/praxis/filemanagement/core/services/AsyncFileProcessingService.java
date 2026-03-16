@@ -204,16 +204,17 @@ public class AsyncFileProcessingService {
      * Create success result with modern Java features
      */
     private FileUploadResultRecord createSuccessResult(MultipartFile file, String savedFilename) {
+        String originalFilename = normalizeOriginalFilename(file);
         String fileId = fileIdMappingService.generateFileId(
             savedFilename,
-            file.getOriginalFilename(),
+            originalFilename,
             "/upload", // Default upload path for async processing
             file.getSize(),
             file.getContentType()
         );
         
         return FileUploadResultRecord.success(
-            file.getOriginalFilename(),
+            originalFilename,
             savedFilename,
             fileId,
             file.getSize(),
@@ -228,10 +229,17 @@ public class AsyncFileProcessingService {
                                                 FileErrorReason reason,
                                                 String message) {
         return FileUploadResultRecord.error(
-            file.getOriginalFilename(),
+            normalizeOriginalFilename(file),
             reason,
             message
         );
+    }
+
+    private String normalizeOriginalFilename(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        return originalFilename == null || originalFilename.isBlank()
+            ? "unknown"
+            : originalFilename;
     }
 
     /**

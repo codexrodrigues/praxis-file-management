@@ -206,6 +206,33 @@ class ErrorMessageUtilsTest {
         assertEquals("Custom error details", response.get("details"));
         assertNotNull(response.get("timestamp"));
     }
+
+    @Test
+    @DisplayName("Should expose merged message catalog and generic fallback")
+    void shouldExposeMergedMessageCatalogAndGenericFallback() {
+        Map<String, String> messages = ErrorMessageUtils.getAllMessages();
+        ErrorMessageUtils.ErrorInfo genericFallback = ErrorMessageUtils.getGenericErrorInfo("DOES_NOT_EXIST");
+
+        assertTrue(messages.containsKey("EMPTY_FILE"));
+        assertTrue(messages.containsKey("RATE_LIMIT_EXCEEDED"));
+        assertEquals("ERRO_DESCONHECIDO", genericFallback.getCode());
+        assertEquals("Erro interno do sistema", genericFallback.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should create specialized file size and malware responses")
+    void shouldCreateSpecializedResponses() {
+        Map<String, Object> sizeResponse = ErrorMessageUtils.createFileSizeExceededResponse(2048L, 1L, "big.txt");
+        Map<String, Object> malwareResponse = ErrorMessageUtils.createMalwareDetectedResponse("EICAR", "bad.txt", 99L);
+
+        assertEquals("ARQUIVO_MUITO_GRANDE", sizeResponse.get("code"));
+        assertEquals("big.txt", sizeResponse.get("originalFilename"));
+        assertEquals(1L, sizeResponse.get("maxSizeMb"));
+
+        assertEquals("MALWARE_DETECTADO", malwareResponse.get("code"));
+        assertEquals("EICAR", malwareResponse.get("virusName"));
+        assertEquals(99L, malwareResponse.get("fileSize"));
+    }
     
     // ==================================================================================
     // TESTES DE CASOS ESPECÍFICOS

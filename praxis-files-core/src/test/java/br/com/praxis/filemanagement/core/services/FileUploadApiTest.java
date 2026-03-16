@@ -222,6 +222,75 @@ public class FileUploadApiTest {
     }
 
     @Test
+    @DisplayName("Should reject file when only allowedExtensions constraint is provided")
+    void shouldRejectFileWhenOnlyAllowedExtensionsConstraintIsProvided() {
+        MultipartFile file = new MockMultipartFile(
+            "file",
+            "document.pdf",
+            "application/pdf",
+            "%PDF-1.4".getBytes()
+        );
+
+        FileUploadOptionsRecord options = FileUploadOptionsRecord.builder()
+            .allowedExtensions(List.of("txt"))
+            .build();
+
+        FileUploadResultRecord result = fileService.uploadFile(file, options);
+
+        assertFalse(result.success());
+        assertEquals(FileErrorReason.INVALID_TYPE, result.errorReason());
+    }
+
+    @Test
+    @DisplayName("Should reject file when only acceptMimeTypes constraint is provided")
+    void shouldRejectFileWhenOnlyAcceptMimeTypesConstraintIsProvided() {
+        MultipartFile file = new MockMultipartFile(
+            "file",
+            "document.txt",
+            "text/plain",
+            "plain text".getBytes()
+        );
+
+        FileUploadOptionsRecord options = FileUploadOptionsRecord.builder()
+            .acceptMimeTypes(List.of("application/pdf"))
+            .build();
+
+        FileUploadResultRecord result = fileService.uploadFile(file, options);
+
+        assertFalse(result.success());
+        assertEquals(FileErrorReason.INVALID_TYPE, result.errorReason());
+    }
+
+    @Test
+    @DisplayName("Should report partial failure in bulk upload when one file violates allowed extension")
+    void shouldReportPartialFailureInBulkUploadWhenOneFileViolatesAllowedExtension() {
+        MultipartFile ok = new MockMultipartFile(
+            "files",
+            "ok.txt",
+            "text/plain",
+            "ok".getBytes()
+        );
+        MultipartFile bad = new MockMultipartFile(
+            "files",
+            "bad.pdf",
+            "application/pdf",
+            "%PDF-1.4".getBytes()
+        );
+
+        FileUploadOptionsRecord options = FileUploadOptionsRecord.builder()
+            .allowedExtensions(List.of("txt"))
+            .build();
+
+        var result = fileService.uploadMultipleFiles(new MultipartFile[]{ok, bad}, options);
+
+        assertEquals(2, result.results().size());
+        assertEquals(1, result.totalSuccess());
+        assertEquals(1, result.totalFailed());
+        assertTrue(result.results().stream().anyMatch(FileUploadResultRecord::success));
+        assertTrue(result.results().stream().anyMatch(item -> !item.success() && item.errorReason() == FileErrorReason.INVALID_TYPE));
+    }
+
+    @Test
     @DisplayName("Should fail upload for empty file")
     void shouldFailUploadForEmptyFile() {
         // Arrange

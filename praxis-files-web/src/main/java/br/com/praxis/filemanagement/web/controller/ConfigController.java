@@ -3,6 +3,7 @@ package br.com.praxis.filemanagement.web.controller;
 import br.com.praxis.filemanagement.api.dtos.EffectiveUploadConfigRecord;
 import br.com.praxis.filemanagement.web.service.FileEffectiveConfigService;
 import br.com.praxis.filemanagement.web.error.ErrorResponse;
+import br.com.praxis.filemanagement.web.response.ApiEnvelopeFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -60,7 +60,8 @@ public class ConfigController {
                     schema = @Schema(implementation = EffectiveUploadConfigRecord.class),
                     examples = @ExampleObject(value = """
                         {
-                          "success": true,
+                          "status": "success",
+                          "message": "Configuração efetiva recuperada com sucesso",
                           "timestamp": "2025-08-22T12:34:56.789Z",
                           "data": {
                             "options": { "nameConflictPolicy": "RENAME" },
@@ -96,10 +97,9 @@ public class ConfigController {
         @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         EffectiveUploadConfigRecord config = configService.getEffectiveConfig(tenantId, userId);
-        Map<String, Object> body = Map.of(
-            "success", true,
-            "timestamp", Instant.now().toString(),
-            "data", config
+        Map<String, Object> body = ApiEnvelopeFactory.success(
+            config,
+            "Configuração efetiva recuperada com sucesso"
         );
 
         String eTag = '"' + Integer.toHexString(config.hashCode()) + '"';

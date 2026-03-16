@@ -132,6 +132,24 @@ public class InputValidationServiceTest {
         assertEquals(FileErrorReason.INVALID_TYPE, result.getPrimaryErrorReason());
     }
 
+    @Test
+    @DisplayName("Should reject excessively long content type")
+    void shouldRejectExcessivelyLongContentType() {
+        MultipartFile file = new MockMultipartFile(
+            "file",
+            "document.txt",
+            "a".repeat(101),
+            "Content".getBytes()
+        );
+
+        InputValidationService.ValidationResult result =
+            validationService.validateUploadFile(file, FileUploadOptionsRecord.defaultOptions());
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorSummary().contains("MIME type muito longo"));
+        assertEquals(FileErrorReason.INVALID_TYPE, result.getPrimaryErrorReason());
+    }
+
     // ==================================================================================
     // TESTES DE VALIDAÇÃO DE NOME DE ARQUIVO
     // ==================================================================================
@@ -187,8 +205,10 @@ public class InputValidationServiceTest {
 
             assertFalse(result.isValid(),
                 "Suspicious filename should be rejected: " + filename);
-            assertEquals(FileErrorReason.SECURITY_VIOLATION, result.getPrimaryErrorReason(),
-                "Should classify as security violation: " + filename);
+            assertTrue(
+                result.getErrors().stream().anyMatch(error -> error.getErrorReason() == FileErrorReason.SECURITY_VIOLATION),
+                "Should include a security violation: " + filename
+            );
         }
     }
 
@@ -412,7 +432,10 @@ public class InputValidationServiceTest {
 
             assertFalse(result.isValid(),
                 "Path traversal should be detected: " + filename);
-            assertEquals(FileErrorReason.SECURITY_VIOLATION, result.getPrimaryErrorReason());
+            assertTrue(
+                result.getErrors().stream().anyMatch(error -> error.getErrorReason() == FileErrorReason.SECURITY_VIOLATION),
+                "Should include a security violation"
+            );
             assertTrue(result.getErrorSummary().contains("path traversal"));
         }
     }
@@ -437,10 +460,11 @@ public class InputValidationServiceTest {
 
         // Assert
         assertFalse(result.isValid(), "Control characters should be detected in strict mode");
-        // Control characters are detected through the filename pattern validation
         assertEquals(FileErrorReason.INVALID_TYPE, result.getPrimaryErrorReason());
-        assertTrue(result.getErrorSummary().contains("caracteres inválidos"),
-            "Should detect invalid characters in filename");
+        assertTrue(
+            result.getErrors().stream().anyMatch(error -> error.getMessage().contains("controle")),
+            "Should detect control characters in filename"
+        );
     }
 
     @Test
@@ -485,6 +509,46 @@ public class InputValidationServiceTest {
 
         // Assert
         assertTrue(result.isValid(), "MIME type mismatch should be allowed in non-strict mode");
+    }
+
+    @Test
+    @DisplayName("Should detect dangerous mime type in strict mode even with matching extension")
+    void shouldDetectDangerousMimeTypeInStrictModeEvenWithMatchingExtension() {
+        MultipartFile file = new MockMultipartFile(
+            "file",
+            "script.sh",
+            "application/x-sh",
+            "echo test".getBytes()
+        );
+        FileUploadOptionsRecord options = FileUploadOptionsRecord.builder()
+            .strictValidation(true)
+            .build();
+
+        InputValidationService.ValidationResult result = validationService.validateUploadFile(file, options);
+
+        assertFalse(result.isValid());
+        assertTrue(
+            result.getErrors().stream().anyMatch(error -> error.getErrorReason() == FileErrorReason.SECURITY_VIOLATION),
+            "Dangerous mime type should be treated as security violation"
+        );
+    }
+
+    @Test
+    @DisplayName("Should allow null mime type and extension helper path in strict mode")
+    void shouldAllowNullMimeTypeInStrictMode() {
+        MultipartFile file = new MockMultipartFile(
+            "file",
+            "document",
+            null,
+            "Content".getBytes()
+        );
+        FileUploadOptionsRecord options = FileUploadOptionsRecord.builder()
+            .strictValidation(true)
+            .build();
+
+        InputValidationService.ValidationResult result = validationService.validateUploadFile(file, options);
+
+        assertTrue(result.isValid());
     }
 
     // ==================================================================================
@@ -551,6 +615,16 @@ public class InputValidationServiceTest {
     }
 
     @Test
+    @DisplayName("Should reject absolute directory path with home expansion character")
+    void shouldRejectAbsoluteDirectoryPathWithHomeExpansionCharacter() {
+        InputValidationService.ValidationResult result =
+            validationService.validateDirectoryPath("/srv/uploads/~shadow");
+
+        assertFalse(result.isValid());
+        assertEquals(FileErrorReason.SECURITY_VIOLATION, result.getPrimaryErrorReason());
+    }
+
+    @Test
     @DisplayName("Should reject relative directory paths")
     void shouldRejectRelativeDirectoryPaths() {
         // Arrange
@@ -574,8 +648,9 @@ public class InputValidationServiceTest {
     void shouldValidateNonNullParameters() {
         // Act & Assert
         assertDoesNotThrow(() -> InputValidationService.requireNonNull("valid", "param"));
-        assertThrows(IllegalArgumentException.class, () ->
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
             InputValidationService.requireNonNull(null, "param"));
+        assertTrue(ex.getMessage().contains("param"));
     }
 
     @Test
@@ -583,12 +658,15 @@ public class InputValidationServiceTest {
     void shouldValidateNonEmptyStrings() {
         // Act & Assert
         assertDoesNotThrow(() -> InputValidationService.requireNonEmpty("valid", "param"));
-        assertThrows(IllegalArgumentException.class, () ->
+        IllegalArgumentException empty = assertThrows(IllegalArgumentException.class, () ->
             InputValidationService.requireNonEmpty("", "param"));
-        assertThrows(IllegalArgumentException.class, () ->
+        IllegalArgumentException blank = assertThrows(IllegalArgumentException.class, () ->
             InputValidationService.requireNonEmpty("   ", "param"));
-        assertThrows(IllegalArgumentException.class, () ->
+        IllegalArgumentException nul = assertThrows(IllegalArgumentException.class, () ->
             InputValidationService.requireNonEmpty(null, "param"));
+        assertTrue(empty.getMessage().contains("vazio"));
+        assertTrue(blank.getMessage().contains("vazio"));
+        assertTrue(nul.getMessage().contains("null"));
     }
 
     @Test
@@ -597,10 +675,12 @@ public class InputValidationServiceTest {
         // Act & Assert
         assertDoesNotThrow(() -> InputValidationService.requirePositive(1L, "param"));
         assertDoesNotThrow(() -> InputValidationService.requirePositive(100L, "param"));
-        assertThrows(IllegalArgumentException.class, () ->
+        IllegalArgumentException zero = assertThrows(IllegalArgumentException.class, () ->
             InputValidationService.requirePositive(0L, "param"));
-        assertThrows(IllegalArgumentException.class, () ->
+        IllegalArgumentException negative = assertThrows(IllegalArgumentException.class, () ->
             InputValidationService.requirePositive(-1L, "param"));
+        assertTrue(zero.getMessage().contains("positivo"));
+        assertTrue(negative.getMessage().contains("-1"));
     }
 
     // ==================================================================================
@@ -635,6 +715,18 @@ public class InputValidationServiceTest {
         assertFalse(result.isValid());
         assertEquals(1, result.getErrors().size());
         assertEquals("Invalid filename", result.getErrorSummary());
+        assertEquals(FileErrorReason.INVALID_TYPE, result.getPrimaryErrorReason());
+    }
+
+    @Test
+    @DisplayName("Should handle null error list in validation result")
+    void shouldHandleNullErrorListInValidationResult() {
+        InputValidationService.ValidationResult result =
+            new InputValidationService.ValidationResult(false, null);
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrors().isEmpty());
+        assertEquals("Validation failed", result.getErrorSummary());
         assertEquals(FileErrorReason.INVALID_TYPE, result.getPrimaryErrorReason());
     }
 

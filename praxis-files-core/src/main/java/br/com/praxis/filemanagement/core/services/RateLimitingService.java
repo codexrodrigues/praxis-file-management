@@ -54,21 +54,21 @@ public class RateLimitingService {
             return true;
         }
 
+        // Check concurrent uploads first so a rejected concurrent attempt does not consume rate-limit tokens.
+        AtomicInteger concurrent = concurrentUploads.computeIfAbsent(ipAddress, k -> new AtomicInteger(0));
+        int currentConcurrent = concurrent.get();
+
+        if (currentConcurrent >= properties.getRateLimit().getMaxConcurrentUploads()) {
+            logger.warn("Security: Concurrent upload limit exceeded for IP: {}", ipAddress);
+            return false;
+        }
+
         // Check rate limits
         Bucket bucket = getBucket(ipAddress);
         boolean allowed = bucket.tryConsume(1);
         
         if (!allowed) {
             logger.warn("Security: Rate limit exceeded for IP: {}", ipAddress);
-            return false;
-        }
-
-        // Check concurrent uploads
-        AtomicInteger concurrent = concurrentUploads.computeIfAbsent(ipAddress, k -> new AtomicInteger(0));
-        int currentConcurrent = concurrent.get();
-        
-        if (currentConcurrent >= properties.getRateLimit().getMaxConcurrentUploads()) {
-            logger.warn("Security: Concurrent upload limit exceeded for IP: {}", ipAddress);
             return false;
         }
 
@@ -92,7 +92,10 @@ public class RateLimitingService {
 
         AtomicInteger concurrent = concurrentUploads.get(ipAddress);
         if (concurrent != null) {
-            concurrent.decrementAndGet();
+            int current = concurrent.decrementAndGet();
+            if (current <= 0) {
+                concurrentUploads.remove(ipAddress, concurrent);
+            }
         }
     }
 
@@ -207,6 +210,7 @@ public class RateLimitingService {
     public void resetRateLimits(String ipAddress) {
         buckets.remove(ipAddress);
         concurrentUploads.remove(ipAddress);
+        lastAccessTime.remove(ipAddress);
         logger.info("Rate limits reset for IP: {}", ipAddress);
     }
 

@@ -3,6 +3,7 @@ package br.com.praxis.filemanagement.web.controller;
 import br.com.praxis.filemanagement.api.dtos.BulkUploadResultRecord;
 import br.com.praxis.filemanagement.api.dtos.FileUploadOptionsRecord;
 import br.com.praxis.filemanagement.api.dtos.FileUploadResultRecord;
+import br.com.praxis.filemanagement.api.enums.NameConflictPolicy;
 import br.com.praxis.filemanagement.api.services.FileService;
 import br.com.praxis.filemanagement.api.enums.FileErrorReason;
 import br.com.praxis.filemanagement.core.utils.ErrorMessageUtils;
@@ -10,6 +11,7 @@ import br.com.praxis.filemanagement.core.services.QuotaService;
 import br.com.praxis.filemanagement.core.services.PresignedUrlService;
 import br.com.praxis.filemanagement.core.exception.QuotaExceededException;
 import br.com.praxis.filemanagement.web.error.ErrorResponse;
+import br.com.praxis.filemanagement.web.response.ApiEnvelopeFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +34,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -110,7 +114,8 @@ public class FileController {
                     name = "Upload bem-sucedido",
                     value = """
                         {
-                          "success": true,
+                          "status": "success",
+                          "message": "Upload realizado com sucesso",
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "data": {
                             "originalFilename": "documento.pdf",
@@ -134,9 +139,15 @@ public class FileController {
                     name = "Vírus detectado",
                     value = """
                         {
-                          "code": "MALWARE_DETECTADO",
+                          "status": "failure",
                           "message": "Malware detectado no arquivo",
-                          "details": "Vírus identificado: EICAR-Test-File",
+                          "errors": [
+                            {
+                              "code": "MALWARE_DETECTADO",
+                              "message": "Malware detectado no arquivo",
+                              "details": "Vírus identificado: EICAR-Test-File"
+                            }
+                          ],
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -153,9 +164,14 @@ public class FileController {
                 examples = @ExampleObject(
                     value = """
                         {
-                          "code": "NAO_AUTORIZADO",
+                          "status": "failure",
                           "message": "Credenciais de autenticação são necessárias",
-                          "details": null,
+                          "errors": [
+                            {
+                              "code": "NAO_AUTORIZADO",
+                              "message": "Credenciais de autenticação são necessárias"
+                            }
+                          ],
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -173,9 +189,15 @@ public class FileController {
                     name = "Arquivo excede limite",
                     value = """
                         {
-                          "code": "ARQUIVO_MUITO_GRANDE",
+                          "status": "failure",
                           "message": "Arquivo excede o tamanho máximo permitido",
-                          "details": "Tamanho do arquivo: 104857600 bytes. Tamanho máximo: 10 MB",
+                          "errors": [
+                            {
+                              "code": "ARQUIVO_MUITO_GRANDE",
+                              "message": "Arquivo excede o tamanho máximo permitido",
+                              "details": "Tamanho do arquivo: 104857600 bytes. Tamanho máximo: 10 MB"
+                            }
+                          ],
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -193,9 +215,15 @@ public class FileController {
                     name = "MIME não permitido",
                     value = """
                         {
-                          "code": "TIPO_ARQUIVO_INVALIDO",
+                          "status": "failure",
                           "message": "Tipo de arquivo não permitido",
-                          "details": "Content-Type: application/x-msdownload",
+                          "errors": [
+                            {
+                              "code": "TIPO_ARQUIVO_INVALIDO",
+                              "message": "Tipo de arquivo não permitido",
+                              "details": "Content-Type: application/x-msdownload"
+                            }
+                          ],
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -213,9 +241,15 @@ public class FileController {
                     name = "Arquivo duplicado",
                     value = """
                         {
-                          "code": "ARQUIVO_JA_EXISTE",
+                          "status": "failure",
                           "message": "Arquivo com este nome já existe",
-                          "details": "Renomeie o arquivo ou escolha outra política",
+                          "errors": [
+                            {
+                              "code": "ARQUIVO_JA_EXISTE",
+                              "message": "Arquivo com este nome já existe",
+                              "details": "Renomeie o arquivo ou escolha outra política"
+                            }
+                          ],
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -233,9 +267,15 @@ public class FileController {
                     name = "Rate limit",
                     value = """
                         {
-                          "code": "LIMITE_TAXA_EXCEDIDO",
+                          "status": "failure",
                           "message": "Limite de taxa de upload excedido",
-                          "details": "Tente novamente em 30 segundos",
+                          "errors": [
+                            {
+                              "code": "LIMITE_TAXA_EXCEDIDO",
+                              "message": "Limite de taxa de upload excedido",
+                              "details": "Tente novamente em 30 segundos"
+                            }
+                          ],
                           "timestamp": "2025-07-10T23:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -288,6 +328,20 @@ public class FileController {
             )
             @RequestParam(value = "options", required = false) String optionsJson,
 
+            @Parameter(
+                description = "Metadados customizados do arquivo em formato JSON",
+                required = false,
+                example = "{\"category\":\"invoice\",\"department\":\"finance\"}"
+            )
+            @RequestParam(value = "metadata", required = false) String metadataJson,
+
+            @Parameter(
+                description = "Política de conflito de nomes sobrescrevendo a opção JSON",
+                required = false,
+                example = "RENAME"
+            )
+            @RequestParam(value = "conflictPolicy", required = false) String conflictPolicy,
+
             @RequestHeader(value = "X-Tenant-Id", required = false) String tenantId,
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) throws JsonProcessingException {
@@ -296,15 +350,7 @@ public class FileController {
                    file.getOriginalFilename(), file.getSize());
 
         // Parse das opções de upload
-        FileUploadOptionsRecord options = null;
-        if (optionsJson != null) {
-            try {
-                options = objectMapper.readValue(optionsJson, FileUploadOptionsRecord.class);
-            } catch (JsonProcessingException e) {
-                logger.error("Failed to parse options JSON", e);
-                throw new JsonProcessingException("Invalid options JSON format") {};
-            }
-        }
+        FileUploadOptionsRecord options = parseSingleUploadOptions(optionsJson, metadataJson, conflictPolicy);
 
         if (quotaService.isTenantQuotaExceeded(tenantId) || quotaService.isUserQuotaExceeded(userId)) {
             throw new QuotaExceededException("Upload quota exceeded");
@@ -319,7 +365,10 @@ public class FileController {
         }
 
         // Converter resultado para formato padronizado
-        Map<String, Object> response = ErrorMessageUtils.convertFileUploadResultRecordToStandardFormat(result);
+        Map<String, Object> response = ApiEnvelopeFactory.fromSingleUploadResult(
+            ErrorMessageUtils.convertFileUploadResultRecordToStandardFormat(result),
+            "Upload realizado com sucesso"
+        );
 
         // Retornar resposta apropriada
         HttpStatus status;
@@ -333,8 +382,79 @@ public class FileController {
         return ResponseEntity.status(status).body(response);
     }
 
+    private FileUploadOptionsRecord parseSingleUploadOptions(
+            String optionsJson,
+            String metadataJson,
+            String conflictPolicy
+    ) throws JsonProcessingException {
+        FileUploadOptionsRecord jsonOptions = null;
+        if (optionsJson != null && !optionsJson.trim().isEmpty()) {
+            try {
+                jsonOptions = objectMapper.readValue(optionsJson, FileUploadOptionsRecord.class);
+            } catch (JsonProcessingException e) {
+                logger.error("Failed to parse options JSON", e);
+                throw new JsonProcessingException("Invalid options JSON format") {};
+            }
+        }
+
+        Map<String, String> customMetadata = jsonOptions != null
+                ? new HashMap<>(jsonOptions.customMetadata())
+                : new HashMap<>();
+
+        if (metadataJson != null && !metadataJson.trim().isEmpty()) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> rawMetadata = objectMapper.readValue(metadataJson, Map.class);
+                rawMetadata.forEach((key, value) -> customMetadata.put(key, value != null ? String.valueOf(value) : null));
+            } catch (JsonProcessingException e) {
+                logger.error("Failed to parse metadata JSON", e);
+                throw new JsonProcessingException("Invalid metadata JSON format") {};
+            }
+        }
+
+        NameConflictPolicy resolvedConflictPolicy = jsonOptions != null
+                ? jsonOptions.nameConflictPolicy()
+                : null;
+        if (conflictPolicy != null && !conflictPolicy.trim().isEmpty()) {
+            try {
+                resolvedConflictPolicy = NameConflictPolicy.valueOf(conflictPolicy.trim().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new JsonProcessingException("Invalid conflictPolicy value") {};
+            }
+        }
+
+        boolean hasOverrides = !customMetadata.isEmpty() || resolvedConflictPolicy != null;
+        if (jsonOptions == null && !hasOverrides) {
+            return null;
+        }
+
+        FileUploadOptionsRecord.Builder builder = FileUploadOptionsRecord.builder();
+        if (jsonOptions != null) {
+            builder.allowedExtensions(jsonOptions.allowedExtensions())
+                    .acceptMimeTypes(jsonOptions.acceptMimeTypes())
+                    .nameConflictPolicy(jsonOptions.nameConflictPolicy())
+                    .maxUploadSizeMb(jsonOptions.maxUploadSizeMb())
+                    .strictValidation(jsonOptions.strictValidation())
+                    .targetDirectory(jsonOptions.targetDirectory())
+                    .enableVirusScanning(jsonOptions.enableVirusScanning())
+                    .customMetadata(jsonOptions.customMetadata())
+                    .failFastMode(jsonOptions.failFastMode());
+        }
+        if (resolvedConflictPolicy != null) {
+            builder.nameConflictPolicy(resolvedConflictPolicy);
+        }
+        if (!customMetadata.isEmpty()) {
+            builder.customMetadata(customMetadata);
+        }
+        return builder.build();
+    }
+
     /**
      * Generates a pre-signed upload URL for external storage systems.
+     *
+     * <p>This endpoint intentionally keeps its raw contract because the frontend
+     * consumes it as a transport target descriptor rather than as a standard API
+     * business response envelope.
      */
     @PostMapping(value = "/upload/presign", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> createPresignedUpload(@RequestParam("filename") String filename) {
@@ -399,7 +519,8 @@ public class FileController {
                         name = "Upload múltiplo com sucessos e falhas",
                         value = """
                             {
-                              "success": false,
+                              "status": "partial_success",
+                              "message": "Upload em lote processado com sucesso parcial",
                               "timestamp": "2025-07-21T20:15:35.456Z",
                               "data": {
                                 "totalProcessed": 3,
@@ -413,20 +534,27 @@ public class FileController {
                                 "successRate": "66.67%",
                                 "results": [
                                   {
-                                    "originalFilename": "doc1.pdf",
-                                    "serverFilename": "doc1_a1b2c3d4.pdf",
-                                    "fileId": "550e8400-e29b-41d4-a716-446655440000",
-                                    "fileSize": 1048576,
-                                    "mimeType": "application/pdf",
-                                    "success": true,
-                                    "uploadTimestamp": "2025-07-21T20:15:31.123Z"
+                                    "fileName": "doc1.pdf",
+                                    "status": "SUCCESS",
+                                    "file": {
+                                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                                      "fileName": "doc1.pdf",
+                                      "contentType": "application/pdf",
+                                      "fileSize": 1048576,
+                                      "uploadedAt": "2025-07-21T20:15:31.123Z",
+                                      "tenantId": "",
+                                      "scanStatus": "PENDING",
+                                      "metadata": {}
+                                    }
                                   },
                                   {
-                                    "originalFilename": "large_file.exe",
-                                    "success": false,
-                                    "errorReason": "FILE_TOO_LARGE",
-                                    "errorMessage": "Arquivo excede o tamanho máximo permitido",
-                                    "uploadTimestamp": "2025-07-21T20:15:32.456Z"
+                                    "fileName": "large_file.exe",
+                                    "status": "FAILED",
+                                    "error": {
+                                      "code": "ARQUIVO_MUITO_GRANDE",
+                                      "message": "Arquivo excede o tamanho máximo permitido",
+                                      "details": "Reduza o tamanho do arquivo ou divida em partes menores"
+                                    }
                                   }
                                 ]
                               }
@@ -437,20 +565,33 @@ public class FileController {
                         name = "Colisão de nome",
                         value = """
                             {
-                              "success": false,
+                              "status": "partial_success",
+                              "message": "Upload em lote processado com sucesso parcial",
                               "timestamp": "2025-07-21T20:15:35.456Z",
                               "data": {
                                 "results": [
                                   {
-                                    "originalFilename": "doc1.pdf",
-                                    "serverFilename": "doc1_a1b2.pdf",
-                                    "success": true
+                                    "fileName": "doc1.pdf",
+                                    "status": "SUCCESS",
+                                    "file": {
+                                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                                      "fileName": "doc1.pdf",
+                                      "contentType": "application/pdf",
+                                      "fileSize": 1048576,
+                                      "uploadedAt": "2025-07-21T20:15:31.123Z",
+                                      "tenantId": "",
+                                      "scanStatus": "PENDING",
+                                      "metadata": {}
+                                    }
                                   },
                                   {
-                                    "originalFilename": "doc1.pdf",
-                                    "success": false,
-                                    "errorReason": "FILE_EXISTS",
-                                    "errorMessage": "Arquivo com este nome já existe"
+                                    "fileName": "doc1.pdf",
+                                    "status": "FAILED",
+                                    "error": {
+                                      "code": "ARQUIVO_JA_EXISTE",
+                                      "message": "Arquivo com este nome já existe",
+                                      "details": "Escolha um nome diferente ou configure a política de conflito"
+                                    }
                                   }
                                 ]
                               }
@@ -461,20 +602,33 @@ public class FileController {
                         name = "Vírus detectado",
                         value = """
                             {
-                              "success": false,
+                              "status": "partial_success",
+                              "message": "Upload em lote processado com sucesso parcial",
                               "timestamp": "2025-07-21T20:15:35.456Z",
                               "data": {
                                 "results": [
                                   {
-                                    "originalFilename": "ok.pdf",
-                                    "serverFilename": "ok_a1b2.pdf",
-                                    "success": true
+                                    "fileName": "ok.pdf",
+                                    "status": "SUCCESS",
+                                    "file": {
+                                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                                      "fileName": "ok.pdf",
+                                      "contentType": "application/pdf",
+                                      "fileSize": 1048576,
+                                      "uploadedAt": "2025-07-21T20:15:31.123Z",
+                                      "tenantId": "",
+                                      "scanStatus": "PENDING",
+                                      "metadata": {}
+                                    }
                                   },
                                   {
-                                    "originalFilename": "infected.exe",
-                                    "success": false,
-                                    "errorReason": "MALWARE_DETECTADO",
-                                    "errorMessage": "Malware detectado no arquivo"
+                                    "fileName": "infected.exe",
+                                    "status": "FAILED",
+                                    "error": {
+                                      "code": "MALWARE_DETECTADO",
+                                      "message": "Malware detectado no arquivo",
+                                      "details": "O arquivo foi identificado como malicioso pelo antivírus"
+                                    }
                                   }
                                 ]
                               }
@@ -494,7 +648,8 @@ public class FileController {
                     name = "Upload múltiplo totalmente bem-sucedido",
                     value = """
                         {
-                          "success": true,
+                          "status": "success",
+                          "message": "Upload em lote realizado com sucesso",
                           "timestamp": "2025-07-21T20:15:35.456Z",
                           "data": {
                             "totalProcessed": 2,
@@ -519,9 +674,15 @@ public class FileController {
                     name = "Erro de validação bulk",
                     value = """
                         {
-                          "code": "BULK_UPLOAD_ERROR",
+                          "status": "failure",
                           "message": "Tamanho total dos arquivos excede o limite permitido",
-                          "details": "Total: 157286400 bytes. Máximo permitido: 100 MB",
+                          "errors": [
+                            {
+                              "code": "BULK_UPLOAD_ERROR",
+                              "message": "Tamanho total dos arquivos excede o limite permitido",
+                              "details": "Total: 157286400 bytes. Máximo permitido: 100 MB"
+                            }
+                          ],
                           "timestamp": "2025-07-21T20:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -539,9 +700,14 @@ public class FileController {
                     name = "Payload excedido",
                     value = """
                         {
-                          "code": "PAYLOAD_TOO_LARGE",
+                          "status": "failure",
                           "message": "Tamanho total dos arquivos excede o limite permitido",
-                          "details": null,
+                          "errors": [
+                            {
+                              "code": "PAYLOAD_TOO_LARGE",
+                              "message": "Tamanho total dos arquivos excede o limite permitido"
+                            }
+                          ],
                           "timestamp": "2025-07-21T20:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -559,9 +725,15 @@ public class FileController {
                     name = "Rate limit bulk",
                     value = """
                         {
-                          "code": "LIMITE_TAXA_EXCEDIDO",
+                          "status": "failure",
                           "message": "Limite de taxa de upload excedido",
-                          "details": "Tente novamente em 60 segundos",
+                          "errors": [
+                            {
+                              "code": "LIMITE_TAXA_EXCEDIDO",
+                              "message": "Limite de taxa de upload excedido",
+                              "details": "Tente novamente em 60 segundos"
+                            }
+                          ],
                           "timestamp": "2025-07-21T20:15:30.123Z",
                           "traceId": "abc123"
                         }
@@ -571,7 +743,7 @@ public class FileController {
         )
     })
     @PostMapping(
-        value = "/upload/bulk",
+        value = {"/upload/bulk", "/bulk"},
         consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE
     )
@@ -628,6 +800,20 @@ public class FileController {
             )
             @RequestParam(value = "options", required = false) String optionsJson,
 
+            @Parameter(
+                description = "Array JSON de metadados por arquivo. Atualmente o backend aceita valores homogêneos no lote.",
+                required = false,
+                example = "[{\"category\":\"invoice\"},{\"category\":\"invoice\"}]"
+            )
+            @RequestParam(value = "metadata", required = false) String metadataJson,
+
+            @Parameter(
+                description = "Array JSON de políticas de conflito por arquivo. Atualmente o backend aceita valores homogêneos no lote.",
+                required = false,
+                example = "[\"RENAME\",\"RENAME\"]"
+            )
+            @RequestParam(value = "conflictPolicy", required = false) String conflictPolicyJson,
+
             // Parâmetros diretos para facilitar uso (opcional)
             @Parameter(
                 description = "Ativar modo fail-fast (para no primeiro erro)",
@@ -663,11 +849,10 @@ public class FileController {
         if (files == null || files.length == 0) {
             logger.warn("Bulk upload request received with no files");
 
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "error", "NO_FILES_PROVIDED",
-                "message", "Nenhum arquivo foi fornecido para upload",
-                "timestamp", java.time.Instant.now().toString()
+            Map<String, Object> errorResponse = ApiEnvelopeFactory.failure(
+                "NO_FILES_PROVIDED",
+                "Nenhum arquivo foi fornecido para upload",
+                "Envie pelo menos um arquivo no campo 'files'"
             );
 
             return ResponseEntity.badRequest().body(errorResponse);
@@ -683,17 +868,19 @@ public class FileController {
         try {
             options = parseUploadOptions(
                 optionsJson,
+                metadataJson,
+                conflictPolicyJson,
+                files != null ? files.length : 0,
                 failFastModeParam,
                 strictValidationParam,
                 maxUploadSizeMbParam
             );
         } catch (JsonProcessingException e) {
             logger.error("Failed to parse upload options: {}", e.getMessage());
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "error", "INVALID_OPTIONS_FORMAT",
-                "message", "Erro ao processar opções de upload: " + e.getMessage(),
-                "timestamp", java.time.Instant.now().toString()
+            Map<String, Object> errorResponse = ApiEnvelopeFactory.failure(
+                "INVALID_OPTIONS_FORMAT",
+                "Erro ao processar opções de upload",
+                e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);
         }
@@ -746,7 +933,8 @@ public class FileController {
      * @param bulkResult Resultado do processamento de upload múltiplo
      * @return Map contendo resposta formatada com structure:
      *         <ul>
-     *           <li>success (boolean) - Indica se operação geral foi bem-sucedida</li>
+     *           <li>status (String) - `success`, `partial_success` ou `failure`</li>
+     *           <li>message (String) - Resumo de negócio coerente com o resultado consolidado</li>
      *           <li>timestamp (String) - Timestamp de conclusão da operação</li>
      *           <li>data (Map) - Dados consolidados incluindo estatísticas e resultados individuais</li>
      *         </ul>
@@ -763,22 +951,64 @@ public class FileController {
         standardData.put("processingTimeMs", bulkResult.processingTimeMs());
         standardData.put("totalSizeBytes", bulkResult.totalSizeBytes());
         standardData.put("successRate", String.format(java.util.Locale.US, "%.2f%%", bulkResult.getSuccessRate()));
-        standardData.put("results", bulkResult.results().stream()
-            .map(result -> {
-                Map<String, Object> standardFormat = ErrorMessageUtils.convertFileUploadResultRecordToStandardFormat(result);
-                if (standardFormat.containsKey("data")) {
-                    return standardFormat.get("data");
-                }
-                return standardFormat;
-            })
-            .toList());
+        java.util.List<Map<String, Object>> standardResults = bulkResult.results().stream()
+            .map(this::convertBulkUploadItemToFrontendFormat)
+            .toList();
+        standardData.put("results", standardResults);
         standardData.put("metadata", bulkResult.metadata());
 
-        return Map.of(
-            "success", bulkResult.overallSuccess(),
-            "timestamp", bulkResult.endTimestamp().toString(),
-            "data", standardData
+        boolean partialSuccess = !bulkResult.overallSuccess() && bulkResult.totalSuccess() > 0;
+        String message = bulkResult.overallSuccess()
+            ? "Upload em lote realizado com sucesso"
+            : (partialSuccess
+                ? "Upload em lote processado com sucesso parcial"
+                : "Upload em lote falhou");
+        String responseStatus = bulkResult.overallSuccess()
+            ? "success"
+            : (partialSuccess ? "partial_success" : "failure");
+
+        return ApiEnvelopeFactory.response(
+            responseStatus,
+            message,
+            standardData,
+            Map.of()
         );
+    }
+
+    private Map<String, Object> convertBulkUploadItemToFrontendFormat(FileUploadResultRecord result) {
+        Map<String, Object> standardFormat = ErrorMessageUtils.convertFileUploadResultRecordToStandardFormat(result);
+        Map<String, Object> frontendItem = new java.util.HashMap<>();
+        frontendItem.put("fileName", result.originalFilename());
+        frontendItem.put("status", result.success() ? "SUCCESS" : "FAILED");
+
+        if (result.success()) {
+            frontendItem.put("file", Map.of(
+                "id", result.fileId() != null ? result.fileId() : "",
+                "fileName", result.originalFilename(),
+                "contentType", result.mimeType() != null ? result.mimeType() : "",
+                "fileSize", result.fileSize(),
+                "uploadedAt", result.uploadTimestamp() != null ? result.uploadTimestamp().toString() : java.time.Instant.now().toString(),
+                "tenantId", "",
+                "scanStatus", "PENDING",
+                "metadata", result.metadata() != null ? result.metadata() : Map.of()
+            ));
+        } else {
+            String code = (String) standardFormat.getOrDefault("code", "ERRO_DESCONHECIDO");
+            String message = (String) standardFormat.getOrDefault("message", "Erro no upload");
+            Object details = standardFormat.getOrDefault("details", result.errorMessage());
+            frontendItem.put("error", Map.of(
+                "status", "failure",
+                "message", message,
+                "errors", List.of(
+                    details != null
+                        ? Map.of("code", code, "message", message, "details", details)
+                        : Map.of("code", code, "message", message)
+                ),
+                "timestamp", standardFormat.getOrDefault("timestamp", java.time.Instant.now().toString())
+            ));
+        }
+
+        return Map.copyOf(frontendItem);
     }
 
     /**
@@ -802,6 +1032,9 @@ public class FileController {
      */
     private FileUploadOptionsRecord parseUploadOptions(
             String optionsJson,
+            String metadataJson,
+            String conflictPolicyJson,
+            int fileCount,
             Boolean failFastModeParam,
             Boolean strictValidationParam,
             Long maxUploadSizeMbParam) throws JsonProcessingException {
@@ -835,9 +1068,9 @@ public class FileController {
                         .failFastMode(jsonOptions.failFastMode())
                         .build();
                 }
-                return jsonOptions;
+                return applyBulkCompatibilityOverrides(jsonOptions, metadataJson, conflictPolicyJson, fileCount);
             }
-            return null; // nenhuma opção fornecida
+            return applyBulkCompatibilityOverrides(null, metadataJson, conflictPolicyJson, fileCount);
         }
 
         var builder = FileUploadOptionsRecord.builder();
@@ -875,12 +1108,112 @@ public class FileController {
         }
 
         FileUploadOptionsRecord mergedOptions = builder.build();
+        mergedOptions = applyBulkCompatibilityOverrides(mergedOptions, metadataJson, conflictPolicyJson, fileCount);
         logger.debug("Merged upload options: failFast={}, strict={}, maxSize={}MB",
                     mergedOptions.failFastMode(),
                     mergedOptions.strictValidation(),
                     mergedOptions.maxUploadSizeMb());
 
         return mergedOptions;
+    }
+
+    private FileUploadOptionsRecord applyBulkCompatibilityOverrides(
+            FileUploadOptionsRecord baseOptions,
+            String metadataJson,
+            String conflictPolicyJson,
+            int fileCount) throws JsonProcessingException {
+        Map<String, String> customMetadata = baseOptions != null
+                ? new HashMap<>(baseOptions.customMetadata())
+                : new HashMap<>();
+
+        if (metadataJson != null && !metadataJson.trim().isEmpty()) {
+            @SuppressWarnings("unchecked")
+            java.util.List<Object> metadataItems = objectMapper.readValue(metadataJson, java.util.List.class);
+            validateBulkCompatibilityArrayLength(metadataItems.size(), fileCount, "metadata");
+
+            Map<String, String> firstNonNullMetadata = null;
+            for (Object item : metadataItems) {
+                if (item == null) {
+                    continue;
+                }
+                if (!(item instanceof Map<?, ?> rawMap)) {
+                    throw new JsonProcessingException("Invalid metadata JSON format") {};
+                }
+                Map<String, String> normalizedMap = new HashMap<>();
+                rawMap.forEach((key, value) -> normalizedMap.put(String.valueOf(key), value != null ? String.valueOf(value) : null));
+                if (firstNonNullMetadata == null) {
+                    firstNonNullMetadata = normalizedMap;
+                } else if (!firstNonNullMetadata.equals(normalizedMap)) {
+                    throw new JsonProcessingException("Per-file metadata is not supported for bulk uploads unless all entries are equal") {};
+                }
+            }
+
+            if (firstNonNullMetadata != null) {
+                customMetadata.putAll(firstNonNullMetadata);
+            }
+        }
+
+        NameConflictPolicy resolvedConflictPolicy = baseOptions != null
+                ? baseOptions.nameConflictPolicy()
+                : null;
+        if (conflictPolicyJson != null && !conflictPolicyJson.trim().isEmpty()) {
+            @SuppressWarnings("unchecked")
+            java.util.List<Object> policyItems = objectMapper.readValue(conflictPolicyJson, java.util.List.class);
+            validateBulkCompatibilityArrayLength(policyItems.size(), fileCount, "conflictPolicy");
+
+            NameConflictPolicy firstNonNullPolicy = null;
+            for (Object item : policyItems) {
+                if (item == null) {
+                    continue;
+                }
+                NameConflictPolicy normalizedPolicy;
+                try {
+                    normalizedPolicy = NameConflictPolicy.valueOf(String.valueOf(item).trim().toUpperCase());
+                } catch (IllegalArgumentException ex) {
+                    throw new JsonProcessingException("Invalid conflictPolicy value") {};
+                }
+                if (firstNonNullPolicy == null) {
+                    firstNonNullPolicy = normalizedPolicy;
+                } else if (firstNonNullPolicy != normalizedPolicy) {
+                    throw new JsonProcessingException("Per-file conflictPolicy is not supported for bulk uploads unless all entries are equal") {};
+                }
+            }
+
+            if (firstNonNullPolicy != null) {
+                resolvedConflictPolicy = firstNonNullPolicy;
+            }
+        }
+
+        boolean hasCompatibilityOverrides = !customMetadata.isEmpty() || resolvedConflictPolicy != null;
+        if (baseOptions == null && !hasCompatibilityOverrides) {
+            return null;
+        }
+
+        FileUploadOptionsRecord.Builder builder = FileUploadOptionsRecord.builder();
+        if (baseOptions != null) {
+            builder.allowedExtensions(baseOptions.allowedExtensions())
+                    .acceptMimeTypes(baseOptions.acceptMimeTypes())
+                    .nameConflictPolicy(baseOptions.nameConflictPolicy())
+                    .maxUploadSizeMb(baseOptions.maxUploadSizeMb())
+                    .strictValidation(baseOptions.strictValidation())
+                    .targetDirectory(baseOptions.targetDirectory())
+                    .enableVirusScanning(baseOptions.enableVirusScanning())
+                    .customMetadata(baseOptions.customMetadata())
+                    .failFastMode(baseOptions.failFastMode());
+        }
+        if (resolvedConflictPolicy != null) {
+            builder.nameConflictPolicy(resolvedConflictPolicy);
+        }
+        if (!customMetadata.isEmpty()) {
+            builder.customMetadata(customMetadata);
+        }
+        return builder.build();
+    }
+
+    private void validateBulkCompatibilityArrayLength(int receivedLength, int fileCount, String fieldName) throws JsonProcessingException {
+        if (fileCount > 0 && receivedLength != fileCount) {
+            throw new JsonProcessingException("Bulk field '" + fieldName + "' length must match files length") {};
+        }
     }
 
     /**

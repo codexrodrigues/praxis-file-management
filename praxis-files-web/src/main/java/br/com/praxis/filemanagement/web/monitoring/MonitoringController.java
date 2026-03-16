@@ -3,6 +3,7 @@ package br.com.praxis.filemanagement.web.monitoring;
 import br.com.praxis.filemanagement.core.config.FileManagementProperties;
 import br.com.praxis.filemanagement.core.monitoring.SystemMonitor;
 import br.com.praxis.filemanagement.web.error.ErrorResponse;
+import br.com.praxis.filemanagement.web.response.ApiEnvelopeFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -148,7 +149,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"UNAUTHORIZED\", \"message\": \"Autenticação necessária\" }
+                        {
+                          \"error\": \"NAO_AUTORIZADO\",
+                          \"status\": \"failure\",
+                          \"code\": \"NAO_AUTORIZADO\",
+                          \"message\": \"Autenticação necessária\",
+                          \"errors\": [
+                            {
+                              \"code\": \"NAO_AUTORIZADO\",
+                              \"message\": \"Autenticação necessária\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -161,7 +173,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"FORBIDDEN\", \"message\": \"Acesso negado\" }
+                        {
+                          \"error\": \"FORBIDDEN\",
+                          \"status\": \"failure\",
+                          \"code\": \"FORBIDDEN\",
+                          \"message\": \"Acesso negado\",
+                          \"errors\": [
+                            {
+                              \"code\": \"FORBIDDEN\",
+                              \"message\": \"Acesso negado\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -260,7 +283,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"UNAUTHORIZED\", \"message\": \"Autenticação necessária\" }
+                        {
+                          \"error\": \"NAO_AUTORIZADO\",
+                          \"status\": \"failure\",
+                          \"code\": \"NAO_AUTORIZADO\",
+                          \"message\": \"Autenticação necessária\",
+                          \"errors\": [
+                            {
+                              \"code\": \"NAO_AUTORIZADO\",
+                              \"message\": \"Autenticação necessária\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -273,7 +307,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"FORBIDDEN\", \"message\": \"Acesso negado\" }
+                        {
+                          \"error\": \"FORBIDDEN\",
+                          \"status\": \"failure\",
+                          \"code\": \"FORBIDDEN\",
+                          \"message\": \"Acesso negado\",
+                          \"errors\": [
+                            {
+                              \"code\": \"FORBIDDEN\",
+                              \"message\": \"Acesso negado\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -353,7 +398,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"UNAUTHORIZED\", \"message\": \"Autenticação necessária\" }
+                        {
+                          \"error\": \"NAO_AUTORIZADO\",
+                          \"status\": \"failure\",
+                          \"code\": \"NAO_AUTORIZADO\",
+                          \"message\": \"Autenticação necessária\",
+                          \"errors\": [
+                            {
+                              \"code\": \"NAO_AUTORIZADO\",
+                              \"message\": \"Autenticação necessária\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -366,7 +422,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"FORBIDDEN\", \"message\": \"Acesso negado\" }
+                        {
+                          \"error\": \"FORBIDDEN\",
+                          \"status\": \"failure\",
+                          \"code\": \"FORBIDDEN\",
+                          \"message\": \"Acesso negado\",
+                          \"errors\": [
+                            {
+                              \"code\": \"FORBIDDEN\",
+                              \"message\": \"Acesso negado\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -434,7 +501,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"UNAUTHORIZED\", \"message\": \"Autenticação necessária\" }
+                        {
+                          \"error\": \"NAO_AUTORIZADO\",
+                          \"status\": \"failure\",
+                          \"code\": \"NAO_AUTORIZADO\",
+                          \"message\": \"Autenticação necessária\",
+                          \"errors\": [
+                            {
+                              \"code\": \"NAO_AUTORIZADO\",
+                              \"message\": \"Autenticação necessária\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -447,7 +525,18 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"FORBIDDEN\", \"message\": \"Acesso negado\" }
+                        {
+                          \"error\": \"FORBIDDEN\",
+                          \"status\": \"failure\",
+                          \"code\": \"FORBIDDEN\",
+                          \"message\": \"Acesso negado\",
+                          \"errors\": [
+                            {
+                              \"code\": \"FORBIDDEN\",
+                              \"message\": \"Acesso negado\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -539,14 +628,19 @@ public class MonitoringController {
                     name = "Versão e recursos",
                     value = """
                         {
-                          \"version\": \"1.1.0-SNAPSHOT\",
-                          \"buildTimestamp\": \"2025-07-21T20:15:35.456Z\",
-                          \"codeVersion\": \"v2.1-failfast-enabled\",
-                          \"features\": {
-                            \"failFastMode\": true,
-                            \"bulkUpload\": true,
-                            \"virusScanning\": false,
-                            \"strictValidation\": true
+                          \"status\": \"success\",
+                          \"message\": \"Informações de versão recuperadas com sucesso\",
+                          \"timestamp\": \"2025-07-21T20:15:35.456Z\",
+                          \"data\": {
+                            \"version\": \"1.1.0-SNAPSHOT\",
+                            \"buildTimestamp\": \"2025-07-21T20:15:35.456Z\",
+                            \"codeVersion\": \"v2.1-failfast-enabled\",
+                            \"features\": {
+                              \"failFastMode\": true,
+                              \"bulkUpload\": true,
+                              \"virusScanning\": false,
+                              \"strictValidation\": true
+                            }
                           }
                         }
                         """
@@ -558,11 +652,20 @@ public class MonitoringController {
             description = "Erro ao obter informações de versão",
             content = @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = Map.class),
+                schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     name = "Falha ao obter",
                     value = """
-                        { \"error\": \"Failed to retrieve version info\" }
+                        {
+                          \"status\": \"failure\",
+                          \"message\": \"Erro interno durante o processamento\",
+                          \"errors\": [
+                            {
+                              \"code\": \"ERRO_INTERNO\",
+                              \"message\": \"Erro interno durante o processamento\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -575,7 +678,16 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"UNAUTHORIZED\", \"message\": \"Autenticação necessária\" }
+                        {
+                          \"status\": \"failure\",
+                          \"message\": \"Autenticação necessária\",
+                          \"errors\": [
+                            {
+                              \"code\": \"NAO_AUTORIZADO\",
+                              \"message\": \"Autenticação necessária\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -588,7 +700,16 @@ public class MonitoringController {
                 schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(
                     value = """
-                        { \"success\": false, \"error\": \"FORBIDDEN\", \"message\": \"Acesso negado\" }
+                        {
+                          \"status\": \"failure\",
+                          \"message\": \"Acesso negado\",
+                          \"errors\": [
+                            {
+                              \"code\": \"FORBIDDEN\",
+                              \"message\": \"Acesso negado\"
+                            }
+                          ]
+                        }
                         """
                 )
             )
@@ -609,7 +730,9 @@ public class MonitoringController {
         );
 
         logger.info("Version endpoint accessed - code version: {}", versionInfo.get("codeVersion"));
-        return ResponseEntity.ok(versionInfo);
+        return ResponseEntity.ok(
+            ApiEnvelopeFactory.success(versionInfo, "Informações de versão recuperadas com sucesso")
+        );
     }
 
     /**
