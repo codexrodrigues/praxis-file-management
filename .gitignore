@@ -1,6 +1,8 @@
 # Maven
 target/
 */target/
+build/
+*/build/
 !.mvn/wrapper/maven-wrapper.jar
 
 # Logs and runtime files
